@@ -31,7 +31,13 @@ jobs:
       - name: Find workspace name
         id: workspace
         run: |
-          WORKSPACE=$(ls ios/*.xcworkspace | head -1 | xargs basename | sed 's/.xcworkspace//')
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -not -name "contentsdata*" | head -1 | xargs basename | sed 's/.xcworkspace//')
+          if [ -z "$WORKSPACE" ]; then
+            echo "No workspace found, listing ios dir:"
+            ls -la ios/
+            find ios -name "*.xcworkspace"
+            exit 1
+          fi
           echo "name=$WORKSPACE" >> $GITHUB_OUTPUT
           echo "Found workspace: $WORKSPACE"
 
@@ -43,9 +49,11 @@ jobs:
       - name: Build archive (unsigned)
         run: |
           cd ios
+          SCHEME=$(xcodebuild -workspace "${{ steps.workspace.outputs.name }}.xcworkspace" -list | grep -A1 "Schemes:" | tail -1 | xargs)
+          echo "Using scheme: $SCHEME"
           xcodebuild \
             -workspace "${{ steps.workspace.outputs.name }}.xcworkspace" \
-            -scheme "${{ steps.workspace.outputs.name }}" \
+            -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphoneos \
             -archivePath ${{ github.workspace }}/build/app.xcarchive \
