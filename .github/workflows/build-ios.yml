@@ -65,7 +65,9 @@ jobs:
       - name: Create IPA from archive
         run: |
           mkdir -p build/Payload
-          cp -r build/app.xcarchive/Products/Applications/*.app build/Payload/
+          APP_PATH=$(find build/app.xcarchive -name "*.app" -type d | head -1)
+          echo "Found app at: $APP_PATH"
+          cp -r "$APP_PATH" build/Payload/
           cd build
           zip -r MellyPlus.ipa Payload
           rm -rf Payload
