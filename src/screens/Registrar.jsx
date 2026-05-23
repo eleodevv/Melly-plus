@@ -1,23 +1,30 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StatusBar } from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Dimensions, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import { REFERENCE_RANGES } from '../utils/glucose';
 
-export default function InputScreen({ navigation, route }) {
+const { width } = Dimensions.get('window');
+
+export default function Registrar({ navigation, route }) {
   const [value, setValue] = useState("");
+  const [food, setFood] = useState("");
+  const [step, setStep] = useState(1);
 
-  // Recibir parámetros
   const { moment, meal } = route.params;
+  const rangeInfo = moment === 'Antes' ? REFERENCE_RANGES.before : REFERENCE_RANGES.after;
+
+  const handleNext = () => {
+    if (value.trim()) setStep(2);
+  };
 
   const handleSave = () => {
-    if (value.trim()) {
-      navigation.replace('Result', { 
-        value: parseInt(value), 
-        moment, 
-        meal 
-      });
-    }
+    navigation.replace('Result', { 
+      value: parseInt(value), 
+      moment, 
+      meal,
+      food: food.trim() || 'No registrado',
+    });
   };
 
   return (
@@ -25,58 +32,106 @@ export default function InputScreen({ navigation, route }) {
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safe}>
 
-        {/* Header con blur */}
-        <BlurView intensity={80} tint="light" style={styles.header_blur}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back_btn}>
-              <Ionicons name="arrow-back" size={24} color="#1a1a1a" />
-            </TouchableOpacity>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.close_btn}>
+            <Ionicons name="close" size={28} color="#1a1a1a" />
+          </TouchableOpacity>
+          <View style={styles.header_center}>
             <Text style={styles.header_title}>{moment} del {meal}</Text>
-            <View style={{ width: 24 }} />
+            <Text style={styles.header_sub}>{rangeInfo.description}</Text>
           </View>
-        </BlurView>
+          <View style={{ width: 28 }} />
+        </View>
+
+        {/* Steps */}
+        <View style={styles.steps}>
+          <View style={[styles.step_bar, { width: step === 1 ? '50%' : '100%' }]} />
+        </View>
 
         <KeyboardAvoidingView 
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <ScrollView 
-            contentContainerStyle={styles.scroll}
-            keyboardShouldPersistTaps="handled"
-          >
 
-            {/* Contexto */}
-            <View style={styles.context}>
-              <Ionicons name="water-outline" size={48} color="#1a1a1a" />
-              <Text style={styles.context_label}>Ingresa tu nivel de glucosa</Text>
+          {step === 1 ? (
+            <View style={styles.body}>
+              {/* Input de glucosa */}
+              <View style={styles.input_section}>
+                <TextInput
+                  style={styles.input}
+                  value={value}
+                  onChangeText={setValue}
+                  keyboardType="numeric"
+                  placeholder="---"
+                  placeholderTextColor="#E8E8E8"
+                  maxLength={3}
+                  autoFocus
+                />
+                <Text style={styles.unit}>mg/dL</Text>
+              </View>
+
+              {/* Rango de referencia */}
+              <View style={styles.range_card}>
+                <Ionicons name="information-circle-outline" size={18} color="#666" />
+                <Text style={styles.range_text}>
+                  Rango normal: {rangeInfo.normal}
+                </Text>
+              </View>
+
+              {/* Botón */}
+              <TouchableOpacity
+                style={[styles.action_btn, !value.trim() && styles.action_btn_disabled]}
+                onPress={handleNext}
+                disabled={!value.trim()}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.action_btn_text}>Siguiente</Text>
+                <Ionicons name="arrow-forward" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
+          ) : (
+            <View style={styles.body}>
+              {/* Input de comida */}
+              <View style={styles.food_section}>
+                <View style={styles.food_header}>
+                  <Ionicons name="restaurant-outline" size={28} color="#1a1a1a" />
+                  <Text style={styles.food_title}>¿Qué comiste?</Text>
+                </View>
+                <Text style={styles.food_sub}>Esto ayuda a entender tus niveles</Text>
+                <TextInput
+                  style={styles.food_input}
+                  value={food}
+                  onChangeText={setFood}
+                  placeholder="Ej: Huevos con pan, fruta, café..."
+                  placeholderTextColor="#BBB"
+                  multiline
+                  autoFocus
+                />
+              </View>
 
-            {/* Input grande */}
-            <View style={styles.input_wrapper}>
-              <TextInput
-                style={styles.input}
-                value={value}
-                onChangeText={setValue}
-                keyboardType="numeric"
-                placeholder="120"
-                placeholderTextColor="#DDD"
-                maxLength={3}
-                autoFocus
-              />
-              <Text style={styles.unit}>mg/dL</Text>
+              {/* Botones */}
+              <View style={styles.btn_row}>
+                <TouchableOpacity
+                  style={styles.secondary_btn}
+                  onPress={handleSave}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.secondary_btn_text}>Saltar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.action_btn}
+                  onPress={handleSave}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.action_btn_text}>Guardar</Text>
+                  <Ionicons name="checkmark" size={22} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
+          )}
 
-            {/* Botón guardar */}
-            <TouchableOpacity
-              style={[styles.save_btn, !value.trim() && styles.save_btn_disabled]}
-              onPress={handleSave}
-              disabled={!value.trim()}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.save_btn_text}>Guardar</Text>
-            </TouchableOpacity>
-
-          </ScrollView>
         </KeyboardAvoidingView>
 
       </SafeAreaView>
@@ -89,90 +144,153 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header_blur: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  back_btn: {
-    padding: 4,
-  },
-  header_title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  scroll: {
-    flexGrow: 1,
+  close_btn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  header_center: {
+    alignItems: 'center',
+  },
+  header_title: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  header_sub: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  steps: {
+    height: 4,
+    backgroundColor: '#F5F5F5',
+    marginHorizontal: 24,
+    borderRadius: 2,
+    marginBottom: 8,
+  },
+  step_bar: {
+    height: '100%',
+    backgroundColor: '#1a1a1a',
+    borderRadius: 2,
+  },
+  body: {
+    flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: 28,
-    paddingTop: 120,
-    paddingBottom: 40,
-    gap: 40,
+    gap: 32,
   },
-  context: {
+  input_section: {
     alignItems: 'center',
-    gap: 16,
-  },
-  context_label: {
-    fontSize: 18,
-    color: '#666',
-    fontWeight: '500',
-  },
-  input_wrapper: {
-    alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   input: {
-    fontSize: 80,
+    fontSize: 96,
     fontWeight: '800',
     color: '#1a1a1a',
     textAlign: 'center',
-    width: 240,
-    borderBottomWidth: 3,
-    borderBottomColor: '#1a1a1a',
-    paddingVertical: 12,
+    width: '100%',
   },
   unit: {
     fontSize: 20,
     color: '#999',
     fontWeight: '600',
   },
-  save_btn: {
+  range_card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  range_text: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  action_btn: {
+    flex: 1,
     backgroundColor: '#1a1a1a',
-    borderRadius: 14,
+    borderRadius: 18,
     paddingVertical: 20,
-    paddingHorizontal: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
     shadowColor: '#1a1a1a',
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 6,
   },
-  save_btn_disabled: {
-    backgroundColor: '#DDD',
+  action_btn_disabled: {
+    backgroundColor: '#E8E8E8',
     shadowOpacity: 0,
+    elevation: 0,
   },
-  save_btn_text: {
+  action_btn_text: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#FFFFFF',
+  },
+  food_section: {
+    gap: 12,
+  },
+  food_header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  food_title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  food_sub: {
+    fontSize: 15,
+    color: '#999',
+  },
+  food_input: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#1a1a1a',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 16,
+    padding: 20,
+    minHeight: 120,
+    textAlignVertical: 'top',
+    marginTop: 8,
+  },
+  btn_row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  secondary_btn: {
+    flex: 1,
+    borderWidth: 2.5,
+    borderColor: '#E8E8E8',
+    borderRadius: 18,
+    paddingVertical: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondary_btn_text: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#999',
   },
 });

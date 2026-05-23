@@ -1,0 +1,60 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Expo prebuild (generate native iOS project)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Build archive (unsigned)
+        run: |
+          cd ios
+          xcodebuild \
+            -workspace mellyplus.xcworkspace \
+            -scheme mellyplus \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath ${{ github.workspace }}/build/mellyplus.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Create IPA from archive
+        run: |
+          mkdir -p build/Payload
+          cp -r build/mellyplus.xcarchive/Products/Applications/*.app build/Payload/
+          cd build
+          zip -r MellyPlus.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Melly-Plus-IPA
+          path: build/MellyPlus.ipa
+          retention-days: 30

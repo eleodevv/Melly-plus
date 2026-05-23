@@ -3,28 +3,26 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import { saveRecord } from '../utils/storage';
+import { getGlucoseStatus } from '../utils/glucose';
+import { useApp } from '../context/AppContext';
 
-export default function ResultScreen({ navigation, route }) {
-  const { value, moment, meal } = route.params;
+export default function Resultado({ navigation, route }) {
+  const { value, moment, meal, food } = route.params;
+  const { profile, refreshRecords } = useApp();
 
-  // Lógica de rangos (ajustar según necesidad médica)
-  const getStatus = (value) => {
-    if (value < 70) return { color: '#E53935', label: 'Bajo', icon: 'alert-circle' };
-    if (value <= 130) return { color: '#43A047', label: 'Normal', icon: 'checkmark-circle' };
-    if (value <= 180) return { color: '#FB8C00', label: 'Elevado', icon: 'warning' };
-    return { color: '#E53935', label: 'Alto', icon: 'alert-circle' };
-  };
+  // Usar rangos reales según el momento
+  const status = getGlucoseStatus(value, moment);
 
-  const status = getStatus(value);
-
-  // Guardar el registro cuando se muestra la pantalla
+  // Guardar el registro
   useEffect(() => {
     const save = async () => {
+      if (!profile) return;
       try {
-        await saveRecord({
+        await saveRecord(profile.id, {
           value,
           moment,
           meal,
+          food,
           status: status.label,
           date: new Date().toLocaleDateString('es-ES', { 
             day: 'numeric', 
@@ -33,7 +31,7 @@ export default function ResultScreen({ navigation, route }) {
           }),
           dayName: new Date().toLocaleDateString('es-ES', { weekday: 'long' }),
         });
-        console.log('Registro guardado exitosamente');
+        await refreshRecords();
       } catch (error) {
         console.error('Error al guardar:', error);
       }
@@ -45,6 +43,13 @@ export default function ResultScreen({ navigation, route }) {
     <View style={[styles.container, { backgroundColor: status.color }]}>
       <StatusBar barStyle="light-content" backgroundColor={status.color} />
       <SafeAreaView style={styles.safe}>
+
+        {/* Header con flecha */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.back_btn}>
+            <Ionicons name="arrow-back" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.body}>
 
@@ -67,15 +72,17 @@ export default function ResultScreen({ navigation, route }) {
           {/* Contexto */}
           <Text style={styles.context}>{moment} del {meal}</Text>
 
+          {/* Comida */}
+          {food && food !== 'No registrado' && (
+            <View style={styles.food_card}>
+              <Ionicons name="restaurant-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.food_text}>{food}</Text>
+            </View>
+          )}
+
           {/* Mensaje */}
           <View style={styles.message_card}>
-            <Text style={styles.message_text}>
-              {status.label === 'Normal' 
-                ? '¡Excelente! Tu nivel está dentro del rango normal.'
-                : status.label === 'Elevado'
-                ? 'Tu nivel está un poco elevado. Mantén tus hábitos saludables.'
-                : 'Consulta con tu médico sobre este resultado.'}
-            </Text>
+            <Text style={styles.message_text}>{status.message}</Text>
           </View>
 
           {/* Botón */}
@@ -101,22 +108,30 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  back_btn: {
+    padding: 4,
+    alignSelf: 'flex-start',
+  },
   body: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
-    gap: 28,
+    gap: 20,
   },
   icon_wrapper: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   value_card: {
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   value: {
-    fontSize: 110,
+    fontSize: 100,
     fontWeight: '800',
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
@@ -124,21 +139,21 @@ const styles = StyleSheet.create({
     textShadowRadius: 8,
   },
   unit: {
-    fontSize: 26,
+    fontSize: 24,
     color: '#FFFFFF',
     fontWeight: '700',
     opacity: 0.9,
   },
   status_pill: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 28,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 24,
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   status_text: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#FFFFFF',
     textTransform: 'uppercase',
@@ -150,11 +165,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     opacity: 0.95,
   },
+  food_card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  food_text: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
   message_card: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 18,
-    padding: 24,
-    marginTop: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 8,
   },
   message_text: {
     fontSize: 18,
@@ -165,18 +194,20 @@ const styles = StyleSheet.create({
   },
   done_btn: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 70,
-    marginTop: 20,
+    borderRadius: 20,
+    paddingVertical: 22,
+    paddingHorizontal: 80,
+    marginTop: 16,
     shadowColor: '#000',
-    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
     shadowRadius: 16,
-    elevation: 6,
+    elevation: 8,
   },
   done_btn_text: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
     color: '#1a1a1a',
+    letterSpacing: 0.5,
   },
 });

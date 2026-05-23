@@ -1,79 +1,28 @@
-import { View, Text, StyleSheet, ScrollView, StatusBar, TouchableOpacity, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { getRecords, clearRecords } from '../utils/storage';
+import { useApp } from '../context/AppContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 
-export default function RecordsScreen() {
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function Historial() {
+  const { records, refreshRecords, profile } = useApp();
 
-  // Cargar registros cuando la pantalla se enfoca
   useFocusEffect(
     useCallback(() => {
-      loadRecords();
+      refreshRecords();
     }, [])
   );
 
-  const loadRecords = async () => {
-    try {
-      const data = await getRecords();
-      setRecords(data);
-    } catch (error) {
-      console.error('Error loading records:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClear = () => {
-    Alert.alert(
-      'Borrar registros',
-      '¿Estás segura de borrar todos los registros?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Borrar', 
-          style: 'destructive',
-          onPress: async () => {
-            await clearRecords();
-            loadRecords();
-          }
-        },
-      ]
-    );
-  };
-
-  // Calcular estadísticas
-  const thisWeekRecords = records.filter(r => {
-    const recordDate = new Date(r.timestamp);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    return recordDate >= weekAgo;
-  });
-
-  const average = thisWeekRecords.length > 0
-    ? Math.round(thisWeekRecords.reduce((sum, r) => sum + r.value, 0) / thisWeekRecords.length)
-    : 0;
   return (
     <>
       <StatusBar barStyle="dark-content" />
       <SafeAreaView style={styles.safe}>
         
-        {/* Header con blur */}
-        <BlurView intensity={80} tint="light" style={styles.header_blur}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Registros</Text>
-            {records.length > 0 && (
-              <TouchableOpacity onPress={handleClear}>
-                <Ionicons name="trash-outline" size={24} color="#E53935" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </BlurView>
+        <View style={styles.header}>
+          <Text style={styles.title}>Historial</Text>
+          <Text style={styles.subtitle}>{profile?.name || ''}</Text>
+        </View>
 
         <ScrollView 
           style={styles.scroll} 
@@ -81,54 +30,40 @@ export default function RecordsScreen() {
           showsVerticalScrollIndicator={false}
         >
           
-          {/* Stats rápidas */}
-          <View style={styles.stats}>
-            <View style={styles.stat_box}>
-              <Ionicons name="calendar-outline" size={24} color="#666" />
-              <Text style={styles.stat_value}>{thisWeekRecords.length}</Text>
-              <Text style={styles.stat_label}>Esta semana</Text>
+          {records.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="document-text-outline" size={64} color="#E8E8E8" />
+              <Text style={styles.empty_title}>Sin registros</Text>
+              <Text style={styles.empty_sub}>Tus mediciones aparecerán aquí</Text>
             </View>
-            <View style={styles.stat_box}>
-              <Ionicons name="pulse-outline" size={24} color="#00C853" />
-              <Text style={[styles.stat_value, { color: '#00C853' }]}>{average || '--'}</Text>
-              <Text style={styles.stat_label}>Promedio</Text>
-            </View>
-          </View>
-
-          {/* Lista de registros */}
-          <View style={styles.records}>
-            <Text style={styles.section_title}>Últimas mediciones</Text>
-            
-            {loading ? (
-              <Text style={styles.empty_text}>Cargando...</Text>
-            ) : records.length === 0 ? (
-              <Text style={styles.empty_text}>No hay registros aún</Text>
-            ) : (
-              records.map(record => (
-                <View key={record.id} style={styles.record_card}>
+          ) : (
+            records.map(record => (
+              <View key={record.id} style={styles.record_card}>
+                <View style={styles.record_top}>
                   <View style={styles.record_left}>
                     <Text style={styles.record_day}>{record.dayName}</Text>
                     <Text style={styles.record_date}>{record.date}</Text>
                   </View>
-                  <View style={styles.record_center}>
-                    <Text style={styles.record_meal}>{record.meal}</Text>
-                    <Text style={styles.record_moment}>{record.moment}</Text>
-                  </View>
-                  <View style={styles.record_right}>
-                    <Text style={[
-                      styles.record_value,
-                      record.status === 'Normal' && { color: '#00C853' },
-                      record.status === 'Elevado' && { color: '#FFC107' },
-                      (record.status === 'Bajo' || record.status === 'Alto') && { color: '#E53935' },
-                    ]}>
-                      {record.value}
-                    </Text>
-                    <Text style={styles.record_unit}>mg/dL</Text>
-                  </View>
+                  <Text style={[
+                    styles.record_value,
+                    record.status === 'Normal' && { color: '#43A047' },
+                    record.status === 'Elevado' && { color: '#FB8C00' },
+                    (record.status === 'Bajo' || record.status === 'Alto') && { color: '#E53935' },
+                  ]}>
+                    {record.value} <Text style={styles.record_unit}>mg/dL</Text>
+                  </Text>
                 </View>
-              ))
-            )}
-          </View>
+                <View style={styles.record_bottom}>
+                  <View style={styles.record_tag}>
+                    <Text style={styles.record_tag_text}>{record.meal} · {record.moment}</Text>
+                  </View>
+                  {record.food && record.food !== 'No registrado' && (
+                    <Text style={styles.record_food}>🍽 {record.food}</Text>
+                  )}
+                </View>
+              </View>
+            ))
+          )}
 
         </ScrollView>
 
@@ -142,124 +77,97 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header_blur: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
     color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#666',
   },
   scroll: {
     flex: 1,
   },
   scroll_content: {
     paddingHorizontal: 24,
-    paddingTop: 120,
     paddingBottom: 100,
   },
-  stats: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
-  },
-  stat_box: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 16,
-    padding: 20,
+  empty: {
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    paddingTop: 80,
+    gap: 12,
   },
-  stat_value: {
-    fontSize: 28,
-    fontWeight: '700',
+  empty_title: {
+    fontSize: 20,
+    fontWeight: '600',
     color: '#1a1a1a',
   },
-  stat_label: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-  },
-  records: {
-    paddingBottom: 24,
-  },
-  section_title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
+  empty_sub: {
+    fontSize: 15,
+    color: '#999',
   },
   record_card: {
-    flexDirection: 'row',
     backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     marginBottom: 12,
+  },
+  record_top: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 10,
   },
-  record_left: {
-    flex: 1,
-  },
+  record_left: {},
   record_day: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 2,
+    textTransform: 'capitalize',
   },
   record_date: {
     fontSize: 13,
     color: '#999',
   },
-  record_center: {
-    flex: 1,
-  },
-  record_meal: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#666',
-    marginBottom: 2,
-  },
-  record_moment: {
-    fontSize: 13,
-    color: '#999',
-  },
-  record_right: {
-    alignItems: 'flex-end',
-  },
   record_value: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 2,
   },
   record_unit: {
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '500',
     color: '#999',
   },
-  empty_text: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 40,
+  record_bottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  record_tag: {
+    backgroundColor: '#E8E8E8',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  record_tag_text: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666',
+  },
+  record_food: {
+    fontSize: 13,
+    color: '#666',
+    fontStyle: 'italic',
   },
 });

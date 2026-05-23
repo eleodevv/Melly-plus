@@ -1,29 +1,31 @@
 {
   "expo": {
-    "name": "my-app",
-    "slug": "my-app",
+    "name": "Melly+",
+    "slug": "melly-plus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/melly+.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/melly+.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.eleodev.mellyplus"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/melly+.png",
         "backgroundColor": "#ffffff"
       },
+      "package": "com.eleodev.mellyplus",
       "edgeToEdgeEnabled": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/melly+.png"
     }
   }
 }

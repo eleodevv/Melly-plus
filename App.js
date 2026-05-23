@@ -3,14 +3,18 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { Platform, View, StatusBar } from 'react-native';
+import { StatusBar } from 'react-native';
 import { useEffect } from 'react';
+import { AppProvider, useApp } from './src/context/AppContext';
 
-import HomeScreen from './src/screens/Inicio';
-import RecordsScreen from './src/screens/Historial';
-import InputScreen from './src/screens/Registrar';
-import ResultScreen from './src/screens/Resultado';
+import Inicio from './src/screens/Inicio';
+import Historial from './src/screens/Historial';
+import Analisis from './src/screens/Analisis';
+import Registrar from './src/screens/Registrar';
+import Resultado from './src/screens/Resultado';
+import Perfiles from './src/screens/Perfiles';
+import Ajustes from './src/screens/Ajustes';
+import Onboarding from './src/screens/Onboarding';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -31,40 +35,39 @@ function HomeTabs() {
           paddingBottom: 12,
         },
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: '600',
-          marginTop: 4,
-        },
-        tabBarIconStyle: {
           marginTop: 4,
         },
       }}
     >
       <Tab.Screen 
         name="HomeTab" 
-        component={HomeScreen}
+        component={Inicio}
         options={{
           tabBarLabel: 'Inicio',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'home' : 'home-outline'} 
-              size={28} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={26} color={color} />
           ),
         }}
       />
       <Tab.Screen 
-        name="Records" 
-        component={RecordsScreen}
+        name="HistorialTab" 
+        component={Historial}
         options={{
-          tabBarLabel: 'Registros',
+          tabBarLabel: 'Historial',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'list' : 'list-outline'} 
-              size={28} 
-              color={color} 
-            />
+            <Ionicons name={focused ? 'list' : 'list-outline'} size={26} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="AnalisisTab" 
+        component={Analisis}
+        options={{
+          tabBarLabel: 'Análisis',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'analytics' : 'analytics-outline'} size={26} color={color} />
           ),
         }}
       />
@@ -78,43 +81,57 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" />
-      <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_bottom',
-            presentation: 'card',
-            gestureEnabled: true,
-            gestureDirection: 'vertical',
-          }}
-        >
+    <AppProvider>
+      <SafeAreaProvider>
+        <StatusBar barStyle="dark-content" />
+        <AppNavigator />
+      </SafeAreaProvider>
+    </AppProvider>
+  );
+}
+
+function AppNavigator() {
+  const { profile, loading } = useApp();
+
+  if (loading) return null;
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_bottom',
+        }}
+      >
+        {!profile ? (
           <Stack.Screen 
-            name="Home" 
-            component={HomeTabs}
-            options={{
-              animation: 'fade',
-            }}
+            name="Onboarding" 
+            component={Onboarding}
+            options={{ animation: 'fade', gestureEnabled: false }}
           />
-          <Stack.Screen 
-            name="Input" 
-            component={InputScreen}
-            options={{
-              animation: 'slide_from_bottom',
-              presentation: 'modal',
-            }}
-          />
-          <Stack.Screen 
-            name="Result" 
-            component={ResultScreen}
-            options={{
-              animation: 'fade',
-              gestureEnabled: false,
-            }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+        ) : (
+          <>
+            <Stack.Screen name="Home" component={HomeTabs} />
+            <Stack.Screen 
+              name="Input" 
+              component={Registrar}
+              options={{ presentation: 'modal' }}
+            />
+            <Stack.Screen 
+              name="Result" 
+              component={Resultado}
+              options={{ animation: 'fade', gestureEnabled: false }}
+            />
+            <Stack.Screen name="Perfiles" component={Perfiles} />
+            <Stack.Screen name="Ajustes" component={Ajustes} />
+            <Stack.Screen 
+              name="OnboardingNew" 
+              component={Onboarding}
+              options={{ animation: 'fade' }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
