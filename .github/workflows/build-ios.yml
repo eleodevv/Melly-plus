@@ -8,6 +8,7 @@ on:
 jobs:
   build-ios:
     runs-on: macos-latest
+    timeout-minutes: 60
     
     steps:
       - name: Checkout code
@@ -25,63 +26,55 @@ jobs:
       - name: Expo prebuild (generate native iOS project)
         run: npx expo prebuild --platform ios --clean
 
-      - name: List iOS directory (debug)
-        run: ls -la ios/
-
-      - name: Find workspace name
-        id: workspace
-        run: |
-          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -not -name "contentsdata*" | head -1 | xargs basename | sed 's/.xcworkspace//')
-          if [ -z "$WORKSPACE" ]; then
-            echo "No workspace found, listing ios dir:"
-            ls -la ios/
-            find ios -name "*.xcworkspace"
-            exit 1
-          fi
-          echo "name=$WORKSPACE" >> $GITHUB_OUTPUT
-          echo "Found workspace: $WORKSPACE"
-
       - name: Install CocoaPods
         run: |
           cd ios
           pod install
 
-      - name: Build app (unsigned)
+      - name: Find workspace and scheme
+        id: xcode
         run: |
-          cd ios
-          SCHEME=$(xcodebuild -workspace "${{ steps.workspace.outputs.name }}.xcworkspace" -list | grep -A1 "Schemes:" | tail -1 | xargs)
-          echo "Using scheme: $SCHEME"
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -not -path "*/Pods/*" | head -1)
+          echo "workspace=$WORKSPACE" >> $GITHUB_OUTPUT
+          echo "Found workspace: $WORKSPACE"
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | head -1 | xargs)
+          echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
+          echo "Found scheme: $SCHEME"
+
+      - name: Build iOS app
+        run: |
+          set -o pipefail
           xcodebuild \
-            -workspace "${{ steps.workspace.outputs.name }}.xcworkspace" \
-            -scheme "$SCHEME" \
+            -workspace "${{ steps.xcode.outputs.workspace }}" \
+            -scheme "${{ steps.xcode.outputs.scheme }}" \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath ${{ github.workspace }}/build/derived \
             -destination "generic/platform=iOS" \
-            build \
+            -derivedDataPath build/derived \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ENABLE_BITCODE=NO \
+            2>&1 | tail -50
 
-      - name: Create IPA
+      - name: Find and package IPA
         run: |
-          echo "=== Looking for .app ==="
-          find build/derived/Build/Products -name "*.app" -type d 2>/dev/null || true
-          find build/derived -name "*.app" -type d 2>/dev/null || true
+          echo "=== Searching for .app ==="
+          find build/derived -name "*.app" -type d
           APP_PATH=$(find build/derived/Build/Products -name "*.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find build/derived -name "*.app" -type d 2>/dev/null | head -1)
           fi
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No .app found. Listing Products dir:"
-            find build/derived/Build -type d | head -20
+            echo "Build failed - checking build log for errors:"
+            find build/derived/Logs -name "*.xcactivitylog" -exec cat {} \; 2>/dev/null | tail -100
             exit 1
           fi
           echo "Found app at: $APP_PATH"
-          mkdir -p build/Payload
-          cp -r "$APP_PATH" build/Payload/
-          cd build
+          mkdir -p output/Payload
+          cp -r "$APP_PATH" output/Payload/
+          cd output
           zip -r MellyPlus.ipa Payload
           rm -rf Payload
 
@@ -89,5 +82,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Melly-Plus-IPA
-          path: build/MellyPlus.ipa
+          path: output/MellyPlus.ipa
           retention-days: 30
