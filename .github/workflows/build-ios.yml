@@ -39,7 +39,12 @@ jobs:
           echo "Found workspace: $WORKSPACE"
           echo "=== All schemes ==="
           xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | grep -v "^$" | head -1 | xargs)
+          # Get the app scheme (not Pods schemes) - usually matches the project name
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | grep -v "^$" | grep -iv "pod\|test\|EX\|RN\|React\|expo" | head -1 | xargs)
+          if [ -z "$SCHEME" ]; then
+            # Fallback: get first scheme that's not a pod
+            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | grep -v "^$" | head -1 | xargs)
+          fi
           echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
           echo "Using scheme: $SCHEME"
 
