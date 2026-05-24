@@ -50,7 +50,7 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -derivedDataPath build/derived \
+            -derivedDataPath ${{ github.workspace }}/build/derived \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -61,14 +61,11 @@ jobs:
       - name: Find and package IPA
         run: |
           echo "=== Searching for .app ==="
-          find build/derived -name "*.app" -type d
-          APP_PATH=$(find build/derived/Build/Products -name "*.app" -type d 2>/dev/null | head -1)
+          find ${{ github.workspace }}/build/derived -name "*.app" -type d 2>/dev/null
+          APP_PATH=$(find ${{ github.workspace }}/build/derived -name "*.app" -type d 2>/dev/null | grep -v "\.app/" | head -1)
           if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find build/derived -name "*.app" -type d 2>/dev/null | head -1)
-          fi
-          if [ -z "$APP_PATH" ]; then
-            echo "Build failed - checking build log for errors:"
-            find build/derived/Logs -name "*.xcactivitylog" -exec cat {} \; 2>/dev/null | tail -100
+            echo "ERROR: No .app found. Full listing:"
+            find ${{ github.workspace }}/build/derived/Build/Products -type d 2>/dev/null | head -30
             exit 1
           fi
           echo "Found app at: $APP_PATH"
