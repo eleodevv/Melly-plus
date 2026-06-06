@@ -25,11 +25,7 @@ export default function Onboarding({ navigation }) {
   const scrollRef = useRef(null);
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
-  const [selectedDays, setSelectedDays] = useState({
-    lunes: { active: true, meal: 'Desayuno' },
-    miercoles: { active: true, meal: 'Comida' },
-    viernes: { active: true, meal: 'Cena' },
-  });
+  const [selectedDays, setSelectedDays] = useState({});
 
   const goNext = () => {
     if (step < 3) {

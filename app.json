@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.eleodev.mellyplus"
+      "bundleIdentifier": "com.eleodev.mellyplus",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,6 +29,11 @@
     },
     "web": {
       "favicon": "./assets/melly+.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "55da0f8c-8f89-4caa-b90f-12979508433e"
+      }
     }
   }
 }

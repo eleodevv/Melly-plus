@@ -96,7 +96,9 @@ export default function Registrar({ navigation, route }) {
               <View style={styles.food_section}>
                 <View style={styles.food_header}>
                   <Ionicons name="restaurant-outline" size={28} color="#1a1a1a" />
-                  <Text style={styles.food_title}>¿Qué comiste?</Text>
+                  <Text style={styles.food_title}>
+                    {meal === 'Desayuno' ? '¿Qué desayunaste?' : meal === 'Comida' ? '¿Qué comiste?' : '¿Qué cenaste?'}
+                  </Text>
                 </View>
                 <Text style={styles.food_sub}>Esto ayuda a entender tus niveles</Text>
                 <TextInput
@@ -188,8 +190,10 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 28,
     gap: 32,
+    paddingBottom: 20,
   },
   input_section: {
     alignItems: 'center',
@@ -223,10 +227,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   action_btn: {
-    flex: 1,
     backgroundColor: '#1a1a1a',
     borderRadius: 18,
-    paddingVertical: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 40,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -236,6 +240,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 6,
+    alignSelf: 'stretch',
   },
   action_btn_disabled: {
     backgroundColor: '#E8E8E8',

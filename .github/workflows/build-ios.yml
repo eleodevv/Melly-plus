@@ -9,7 +9,7 @@ jobs:
   build-ios:
     runs-on: macos-latest
     timeout-minutes: 60
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,32 +23,66 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Expo prebuild (generate native iOS project)
+      - name: Expo prebuild
         run: npx expo prebuild --platform ios --clean
 
       - name: Install CocoaPods
+        run: pod install
+        working-directory: ios
+
+      - name: Create self-signed certificate
         run: |
-          cd ios
-          pod install
+          # Crear certificado autofirmado para poder compilar
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          # Generar certificado de desarrollo autofirmado
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /tmp/cert.key \
+            -out /tmp/cert.crt \
+            -subj "/CN=iPhone Developer/O=MellyPlus/C=US"
+
+          openssl pkcs12 -export \
+            -inkey /tmp/cert.key \
+            -in /tmp/cert.crt \
+            -out /tmp/cert.p12 \
+            -passout pass:""
+
+          security import /tmp/cert.p12 \
+            -k build.keychain \
+            -P "" \
+            -T /usr/bin/codesign
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "" build.keychain
 
       - name: Find workspace and scheme
         id: xcode
         run: |
-          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -not -path "*/Pods/*" | head -1)
+          WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -1)
           echo "workspace=$WORKSPACE" >> $GITHUB_OUTPUT
           echo "Found workspace: $WORKSPACE"
-          echo "=== All schemes ==="
           xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null
-          # Get the app scheme (not Pods schemes) - usually matches the project name
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | grep -v "^$" | grep -iv "pod\|test\|EX\|RN\|React\|expo" | head -1 | xargs)
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null \
+            | sed -n '/Schemes:/,/^$/p' \
+            | grep -v "Schemes:" \
+            | grep -v "^$" \
+            | grep -iv "pod\|EX\|RCT\|React\|expo\|test" \
+            | head -1 | xargs)
           if [ -z "$SCHEME" ]; then
-            # Fallback: get first scheme that's not a pod
-            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | grep -v "^$" | head -1 | xargs)
+            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null \
+              | sed -n '/Schemes:/,/^$/p' \
+              | grep -v "Schemes:" \
+              | grep -v "^$" \
+              | head -1 | xargs)
           fi
           echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
           echo "Using scheme: $SCHEME"
 
-      - name: Build iOS app
+      - name: Build and Archive
         run: |
           xcodebuild \
             -workspace "${{ steps.xcode.outputs.workspace }}" \
@@ -56,40 +90,62 @@ jobs:
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -derivedDataPath ${{ github.workspace }}/build/derived \
-            CONFIGURATION_BUILD_DIR=${{ github.workspace }}/build/output \
-            CODE_SIGN_IDENTITY="" \
+            -archivePath ${{ github.workspace }}/build/app.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_STYLE=Manual \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGN_IDENTITY="-" \
             ENABLE_BITCODE=NO \
-            2>&1 | tail -20
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tail -50
 
-      - name: Find and package IPA
+      - name: Export IPA
         run: |
-          echo "=== Output dir ==="
-          ls -la ${{ github.workspace }}/build/output/ 2>/dev/null || true
-          find ${{ github.workspace }}/build/output -name "*.app" -type d 2>/dev/null || true
-          APP_PATH=$(find ${{ github.workspace }}/build/output -name "*.app" -type d 2>/dev/null | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "Not in output, searching everywhere..."
-            find ${{ github.workspace }}/build -name "*.app" -type d 2>/dev/null
-            APP_PATH=$(find ${{ github.workspace }}/build -name "*.app" -type d 2>/dev/null | grep -v "\.app/" | head -1)
-          fi
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No .app found"
-            exit 1
-          fi
-          echo "Found app at: $APP_PATH"
-          mkdir -p output/Payload
-          cp -r "$APP_PATH" output/Payload/
-          cd output
-          zip -r MellyPlus.ipa Payload
-          rm -rf Payload
+          # Crear ExportOptions.plist
+          cat > /tmp/ExportOptions.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+          </dict>
+          </plist>
+          PLIST
 
-      - name: Upload IPA artifact
+          # Intentar exportar, si falla empaquetar manualmente
+          xcodebuild -exportArchive \
+            -archivePath ${{ github.workspace }}/build/app.xcarchive \
+            -exportPath ${{ github.workspace }}/build/export \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            2>&1 || true
+
+          # Si no se generó el IPA, empaquetar manualmente desde el archive
+          if [ ! -f "${{ github.workspace }}/build/export/*.ipa" ]; then
+            echo "Packaging manually from archive..."
+            APP_PATH=$(find ${{ github.workspace }}/build/app.xcarchive -name "*.app" -type d | head -1)
+            echo "Found app: $APP_PATH"
+            if [ -n "$APP_PATH" ]; then
+              mkdir -p ${{ github.workspace }}/build/Payload
+              cp -r "$APP_PATH" ${{ github.workspace }}/build/Payload/
+              cd ${{ github.workspace }}/build
+              zip -r MellyPlus.ipa Payload
+              rm -rf Payload
+            fi
+          else
+            cp ${{ github.workspace }}/build/export/*.ipa ${{ github.workspace }}/build/MellyPlus.ipa
+          fi
+
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Melly-Plus-IPA
-          path: output/MellyPlus.ipa
+          path: build/MellyPlus.ipa
           retention-days: 30
