@@ -103,44 +103,27 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Crear ExportOptions.plist
-          cat > /tmp/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>ad-hoc</string>
-            <key>compileBitcode</key>
-            <false/>
-            <key>signingStyle</key>
-            <string>manual</string>
-          </dict>
-          </plist>
-          PLIST
+          echo "=== Archive contents ==="
+          find ${{ github.workspace }}/build/app.xcarchive -name "*.app" -type d 2>/dev/null || echo "No .app found in archive"
+          ls -la ${{ github.workspace }}/build/app.xcarchive/Products/ 2>/dev/null || echo "No Products dir"
 
-          # Intentar exportar, si falla empaquetar manualmente
-          xcodebuild -exportArchive \
-            -archivePath ${{ github.workspace }}/build/app.xcarchive \
-            -exportPath ${{ github.workspace }}/build/export \
-            -exportOptionsPlist /tmp/ExportOptions.plist \
-            2>&1 || true
+          APP_PATH=$(find ${{ github.workspace }}/build/app.xcarchive -name "*.app" -type d | grep -v "\.app/" | head -1)
 
-          # Si no se generó el IPA, empaquetar manualmente desde el archive
-          if [ ! -f "${{ github.workspace }}/build/export/*.ipa" ]; then
-            echo "Packaging manually from archive..."
-            APP_PATH=$(find ${{ github.workspace }}/build/app.xcarchive -name "*.app" -type d | head -1)
-            echo "Found app: $APP_PATH"
-            if [ -n "$APP_PATH" ]; then
-              mkdir -p ${{ github.workspace }}/build/Payload
-              cp -r "$APP_PATH" ${{ github.workspace }}/build/Payload/
-              cd ${{ github.workspace }}/build
-              zip -r MellyPlus.ipa Payload
-              rm -rf Payload
-            fi
-          else
-            cp ${{ github.workspace }}/build/export/*.ipa ${{ github.workspace }}/build/MellyPlus.ipa
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Archive has no .app. Build did not produce the app bundle."
+            echo "=== Archive tree ==="
+            find ${{ github.workspace }}/build/app.xcarchive -maxdepth 4 -type d
+            exit 1
           fi
+
+          echo "Found app: $APP_PATH"
+          mkdir -p ${{ github.workspace }}/build/Payload
+          cp -r "$APP_PATH" ${{ github.workspace }}/build/Payload/
+          cd ${{ github.workspace }}/build
+          zip -r MellyPlus.ipa Payload
+          rm -rf Payload
+          echo "=== IPA created ==="
+          ls -lh MellyPlus.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
