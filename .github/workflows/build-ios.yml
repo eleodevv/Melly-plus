@@ -64,22 +64,18 @@ jobs:
           WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -1)
           echo "workspace=$WORKSPACE" >> $GITHUB_OUTPUT
           echo "Found workspace: $WORKSPACE"
+          echo "=== All schemes ==="
           xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null
+          # El scheme de la app en Expo siempre coincide con el nombre del slug en app.json
+          # Para este proyecto es "mellyplus" o "Melly"
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null \
             | sed -n '/Schemes:/,/^$/p' \
             | grep -v "Schemes:" \
             | grep -v "^$" \
-            | grep -iv "pod\|EX\|RCT\|React\|expo\|test" \
-            | head -1 | xargs)
-          if [ -z "$SCHEME" ]; then
-            SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null \
-              | sed -n '/Schemes:/,/^$/p' \
-              | grep -v "Schemes:" \
-              | grep -v "^$" \
-              | head -1 | xargs)
-          fi
+            | awk '{$1=$1};1' \
+            | tail -1)
           echo "scheme=$SCHEME" >> $GITHUB_OUTPUT
-          echo "Using scheme: $SCHEME"
+          echo "Using scheme: [$SCHEME]"
 
       - name: Build and Archive
         run: |
